@@ -257,7 +257,7 @@
 
         const player = {
             x: 400,
-            y: 500,
+            y: 540,
             width: 30,
             height: 40,
             speed: 300,
@@ -278,7 +278,7 @@
             bugs = [];
             
             for (let i = 1; i <= 100; i++) {
-                const floorY = 600 - (i - 1) * 80;
+                const floorY = 580 - (i - 1) * 80;
                 floors.push({
                     number: i,
                     y: floorY,
@@ -341,11 +341,7 @@
             player.isJumping = true;
             currentFloor++;
             
-            const targetFloor = floors.find(f => f.number === currentFloor);
-            if (targetFloor) {
-                camera.targetY = 600 - (currentFloor * 80);
-                if (camera.targetY > 0) camera.targetY = 0;
-            }
+            camera.targetY = -(currentFloor - 1) * 80;
             
             if (currentFloor === 100) {
                 winGame();
@@ -375,11 +371,7 @@
             player.isJumping = true;
             currentFloor--;
             
-            const targetFloor = floors.find(f => f.number === currentFloor);
-            if (targetFloor) {
-                camera.targetY = 600 - (currentFloor * 80);
-                if (camera.targetY > 0) camera.targetY = 0;
-            }
+            camera.targetY = -(currentFloor - 1) * 80;
             
             setTimeout(() => {
                 player.isJumping = false;
