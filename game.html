@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>爬100层 - 跳跃挑战</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background: linear-gradient(180deg, #87CEEB 0%, #1a1a2e 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        #gameContainer {
+            position: relative;
+            width: 800px;
+            height: 600px;
+            background: linear-gradient(180deg, #2c3e50 0%, #34495e 50%, #1a252f 100%);
+            border: 4px solid #f39c12;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 0 30px rgba(0,0,0,0.5);
+        }
+
+        #startScreen, #gameOverScreen, #winScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            color: white;
+        }
+
+        #startScreen h1, #gameOverScreen h1, #winScreen h1 {
+            font-size: 48px;
+            color: #f39c12;
+            margin-bottom: 20px;
+            text-shadow: 3px 3px 6px rgba(0,0,0,0.5);
+        }
+
+        .instructions {
+            background: rgba(52, 73, 94, 0.9);
+            padding: 20px 30px;
+            border-radius: 10px;
+            margin: 20px;
+            max-width: 600px;
+            line-height: 1.8;
+        }
+
+        .instructions h2 {
+            color: #e74c3c;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .instructions p {
+            color: #ecf0f1;
+            margin: 8px 0;
+            font-size: 16px;
+        }
+
+        .instructions .key {
+            display: inline-block;
+            background: #f39c12;
+            color: #2c3e50;
+            padding: 3px 10px;
+            border-radius: 5px;
+            font-weight: bold;
+            margin: 0 3px;
+        }
+
+        .instructions .warning {
+            color: #e74c3c;
+            font-weight: bold;
+            font-size: 18px;
+        }
+
+        .stats {
+            background: rgba(52, 73, 94, 0.9);
+            padding: 20px 30px;
+            border-radius: 10px;
+            margin: 15px;
+            text-align: left;
+        }
+
+        .stats p {
+            color: #ecf0f1;
+            margin: 10px 0;
+            font-size: 18px;
+        }
+
+        .stats .highlight {
+            color: #f39c12;
+            font-weight: bold;
+            font-size: 24px;
+        }
+
+        button {
+            background: linear-gradient(180deg, #f39c12 0%, #e67e22 100%);
+            color: white;
+            border: none;
+            padding: 15px 50px;
+            font-size: 24px;
+            border-radius: 10px;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: all 0.3s;
+            font-weight: bold;
+        }
+
+        button:hover {
+            background: linear-gradient(180deg, #e67e22 0%, #d35400 100%);
+            transform: scale(1.05);
+        }
+
+        #hud {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            display: flex;
+            justify-content: space-between;
+            z-index: 50;
+            pointer-events: none;
+        }
+
+        .hud-item {
+            background: rgba(0,0,0,0.7);
+            padding: 10px 20px;
+            border-radius: 8px;
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        #dangerTimer {
+            position: absolute;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(231, 76, 60, 0.9);
+            padding: 15px 40px;
+            border-radius: 10px;
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            z-index: 60;
+            display: none;
+            animation: pulse 0.5s infinite alternate;
+        }
+
+        @keyframes pulse {
+            from { transform: translateX(-50%) scale(1); }
+            to { transform: translateX(-50%) scale(1.1); }
+        }
+
+        #gameCanvas {
+            display: block;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        
+        <div id="hud">
+            <div class="hud-item">楼层: <span id="floorDisplay">1</span> / 100</div>
+            <div class="hud-item">时间: <span id="timeDisplay">0</span> 秒</div>
+            <div class="hud-item">被碰次数: <span id="hitCount">0</span></div>
+        </div>
+
+        <div id="dangerTimer">
+            ⚠️ 危险！按 ↓ 跳下去逃生！剩余: <span id="dangerCountdown">4.0</span> 秒
+        </div>
+
+        <div id="startScreen">
+            <h1>🏢 爬100层 🏢</h1>
+            <div class="instructions">
+                <h2>🎮 游戏说明</h2>
+                <p><span class="key">←</span> <span class="key">→</span> 左右移动</p>
+                <p><span class="key">空格</span> 向上跳跃一层</p>
+                <p class="warning"><span class="key">↓</span> 向下跳跃（被虫子碰到后必须使用！）</p>
+                <hr style="margin: 15px 0; border-color: #7f8c8d;">
+                <p><strong>目标：</strong> 从第1层开始，跳跃到第100层获胜！</p>
+                <p><strong>危险：</strong> 每层都有虫子在移动，不要被碰到！</p>
+                <p class="warning"><strong>⚠️ 重要规则：</strong></p>
+                <p>如果被虫子碰到，你有 <strong>4秒</strong> 时间按 <span class="key">↓</span> 向下跳一层逃生！</p>
+                <p>超过4秒不跳下去，游戏将结束！</p>
+                <p><strong>注意：</strong> 从第1层跳下去会直接掉出游戏！</p>
+            </div>
+            <button id="startBtn">开始游戏</button>
+        </div>
+
+        <div id="gameOverScreen" class="hidden">
+            <h1>💀 游戏结束 💀</h1>
+            <div class="stats">
+                <p>到达楼层: <span class="highlight" id="finalFloor">0</span></p>
+                <p>游戏时间: <span class="highlight" id="finalTime">0</span> 秒</p>
+                <p>被虫子碰到次数: <span class="highlight" id="finalHits">0</span></p>
+                <p>成功逃生次数: <span class="highlight" id="finalEscapes">0</span></p>
+                <p id="deathReason" style="color: #e74c3c; margin-top: 15px;"></p>
+            </div>
+            <button id="restartBtn">再来一次</button>
+        </div>
+
+        <div id="winScreen" class="hidden">
+            <h1>🎉 恭喜通关！🎉</h1>
+            <div class="stats">
+                <p>到达楼层: <span class="highlight">100</span> 🏆</p>
+                <p>通关时间: <span class="highlight" id="winTime">0</span> 秒</p>
+                <p>被虫子碰到次数: <span class="highlight" id="winHits">0</span></p>
+                <p>成功逃生次数: <span class="highlight" id="winEscapes">0</span></p>
+            </div>
+            <button id="playAgainBtn">再玩一次</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        let gameState = 'start';
+        let currentFloor = 1;
+        let gameTime = 0;
+        let hitCount = 0;
+        let escapeCount = 0;
+        let lastTime = 0;
+        let dangerTimer = 0;
+        let isDanger = false;
+        
+        const keys = {
+            left: false,
+            right: false,
+            up: false,
+            down: false
+        };
+
+        const player = {
+            x: 400,
+            y: 500,
+            width: 30,
+            height: 40,
+            speed: 300,
+            color: '#3498db',
+            isJumping: false
+        };
+
+        let floors = [];
+        let bugs = [];
+
+        const camera = {
+            y: 0,
+            targetY: 0
+        };
+
+        function initFloors() {
+            floors = [];
+            bugs = [];
+            
+            for (let i = 1; i <= 100; i++) {
+                const floorY = 600 - (i - 1) * 80;
+                floors.push({
+                    number: i,
+                    y: floorY,
+                    width: 800,
+                    height: 20,
+                    color: i === 100 ? '#f1c40f' : '#7f8c8d'
+                });
+                
+                if (i < 100) {
+                    const direction = Math.random() > 0.5 ? 1 : -1;
+                    const baseSpeed = 80 + (i * 1.5);
+                    const startX = direction > 0 ? -20 : 820;
+                    
+                    bugs.push({
+                        floor: i,
+                        x: startX,
+                        y: floorY - 25,
+                        width: 25,
+                        height: 20,
+                        speed: baseSpeed,
+                        direction: direction,
+                        color: i > 70 ? '#e74c3c' : i > 40 ? '#e67e22' : '#27ae60'
+                    });
+                }
+            }
+        }
+
+        function resetGame() {
+            currentFloor = 1;
+            gameTime = 0;
+            hitCount = 0;
+            escapeCount = 0;
+            isDanger = false;
+            dangerTimer = 0;
+            
+            player.x = 400;
+            player.y = 500;
+            player.isJumping = false;
+            
+            camera.y = 0;
+            camera.targetY = 0;
+            
+            initFloors();
+            updateHUD();
+            
+            document.getElementById('dangerTimer').style.display = 'none';
+        }
+
+        function updateHUD() {
+            document.getElementById('floorDisplay').textContent = currentFloor;
+            document.getElementById('timeDisplay').textContent = Math.floor(gameTime);
+            document.getElementById('hitCount').textContent = hitCount;
+        }
+
+        function jumpUp() {
+            if (isDanger) return;
+            if (player.isJumping) return;
+            if (currentFloor >= 100) return;
+            
+            player.isJumping = true;
+            currentFloor++;
+            
+            const targetFloor = floors.find(f => f.number === currentFloor);
+            if (targetFloor) {
+                camera.targetY = 600 - (currentFloor * 80);
+                if (camera.targetY > 0) camera.targetY = 0;
+            }
+            
+            if (currentFloor === 100) {
+                winGame();
+            }
+            
+            setTimeout(() => {
+                player.isJumping = false;
+            }, 200);
+            
+            updateHUD();
+        }
+
+        function jumpDown() {
+            if (player.isJumping) return;
+            if (currentFloor <= 1) {
+                gameOver('从第1层掉下去了！');
+                return;
+            }
+            
+            if (isDanger) {
+                escapeCount++;
+                isDanger = false;
+                dangerTimer = 0;
+                document.getElementById('dangerTimer').style.display = 'none';
+            }
+            
+            player.isJumping = true;
+            currentFloor--;
+            
+            const targetFloor = floors.find(f => f.number === currentFloor);
+            if (targetFloor) {
+                camera.targetY = 600 - (currentFloor * 80);
+                if (camera.targetY > 0) camera.targetY = 0;
+            }
+            
+            setTimeout(() => {
+                player.isJumping = false;
+            }, 200);
+            
+            updateHUD();
+        }
+
+        function getHit() {
+            if (isDanger) return;
+            
+            hitCount++;
+            isDanger = true;
+            dangerTimer = 4.0;
+            
+            document.getElementById('dangerTimer').style.display = 'block';
+            updateHUD();
+        }
+
+        function gameOver(reason) {
+            gameState = 'gameOver';
+            
+            document.getElementById('finalFloor').textContent = currentFloor;
+            document.getElementById('finalTime').textContent = Math.floor(gameTime);
+            document.getElementById('finalHits').textContent = hitCount;
+            document.getElementById('finalEscapes').textContent = escapeCount;
+            document.getElementById('deathReason').textContent = '死因：' + reason;
+            
+            document.getElementById('dangerTimer').style.display = 'none';
+            document.getElementById('gameOverScreen').classList.remove('hidden');
+        }
+
+        function winGame() {
+            gameState = 'win';
+            
+            document.getElementById('winTime').textContent = Math.floor(gameTime);
+            document.getElementById('winHits').textContent = hitCount;
+            document.getElementById('winEscapes').textContent = escapeCount;
+            
+            document.getElementById('dangerTimer').style.display = 'none';
+            document.getElementById('winScreen').classList.remove('hidden');
+        }
+
+        function checkCollision(rect1, rect2) {
+            return rect1.x < rect2.x + rect2.width &&
+                   rect1.x + rect1.width > rect2.x &&
+                   rect1.y < rect2.y + rect2.height &&
+                   rect1.y + rect1.height > rect2.y;
+        }
+
+        function update(deltaTime) {
+            if (gameState !== 'playing') return;
+            
+            gameTime += deltaTime;
+            
+            if (keys.left) {
+                player.x -= player.speed * deltaTime;
+            }
+            if (keys.right) {
+                player.x += player.speed * deltaTime;
+            }
+            
+            if (player.x < 0) player.x = 0;
+            if (player.x > canvas.width - player.width) {
+                player.x = canvas.width - player.width;
+            }
+            
+            camera.y += (camera.targetY - camera.y) * 5 * deltaTime;
+            
+            bugs.forEach(bug => {
+                bug.x += bug.speed * bug.direction * deltaTime;
+                
+                if (bug.x < -30) {
+                    bug.x = -30;
+                    bug.direction = 1;
+                }
+                if (bug.x > canvas.width + 5) {
+                    bug.x = canvas.width + 5;
+                    bug.direction = -1;
+                }
+            });
+            
+            if (isDanger) {
+                dangerTimer -= deltaTime;
+                document.getElementById('dangerCountdown').textContent = dangerTimer.toFixed(1);
+                
+                if (dangerTimer <= 0) {
+                    gameOver('被虫子碰到后4秒内没有跳下去逃生！');
+                    return;
+                }
+            }
+            
+            bugs.forEach(bug => {
+                if (bug.floor === currentFloor) {
+                    const playerRect = {
+                        x: player.x,
+                        y: player.y,
+                        width: player.width,
+                        height: player.height
+                    };
+                    
+                    const bugRect = {
+                        x: bug.x,
+                        y: bug.y - camera.y,
+                        width: bug.width,
+                        height: bug.height
+                    };
+                    
+                    if (checkCollision(playerRect, bugRect)) {
+                        if (!isDanger) {
+                            getHit();
+                        }
+                    }
+                }
+            });
+            
+            updateHUD();
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            gradient.addColorStop(0, '#2c3e50');
+            gradient.addColorStop(0.5, '#34495e');
+            gradient.addColorStop(1, '#1a252f');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            floors.forEach(floor => {
+                const screenY = floor.y - camera.y;
+                
+                if (screenY > -50 && screenY < canvas.height + 50) {
+                    ctx.fillStyle = floor.color;
+                    ctx.fillRect(0, screenY, floor.width, floor.height);
+                    
+                    ctx.fillStyle = '#fff';
+                    ctx.font = 'bold 14px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(`${floor.number}层`, 70, screenY + 14);
+                    
+                    if (floor.number === 100) {
+                        ctx.fillStyle = '#f39c12';
+                        ctx.font = 'bold 16px Arial';
+                        ctx.fillText('🏆 终点 🏆', canvas.width / 2, screenY + 14);
+                    }
+                }
+            });
+            
+            bugs.forEach(bug => {
+                const screenY = bug.y - camera.y;
+                
+                if (screenY > -50 && screenY < canvas.height + 50) {
+                    ctx.fillStyle = bug.color;
+                    
+                    ctx.beginPath();
+                    ctx.ellipse(
+                        bug.x + bug.width / 2,
+                        screenY + bug.height / 2,
+                        bug.width / 2,
+                        bug.height / 2,
+                        0, 0, Math.PI * 2
+                    );
+                    ctx.fill();
+                    
+                    ctx.fillStyle = '#fff';
+                    const eyeOffset = bug.direction > 0 ? 5 : -5;
+                    ctx.beginPath();
+                    ctx.arc(bug.x + bug.width / 2 + eyeOffset, screenY + 5, 4, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    ctx.fillStyle = '#000';
+                    ctx.beginPath();
+                    ctx.arc(bug.x + bug.width / 2 + eyeOffset + (bug.direction > 0 ? 1 : -1), screenY + 5, 2, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    ctx.strokeStyle = bug.color;
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(bug.x + bug.width / 2 - 5, screenY);
+                    ctx.lineTo(bug.x + bug.width / 2 - 8, screenY - 8);
+                    ctx.moveTo(bug.x + bug.width / 2 + 5, screenY);
+                    ctx.lineTo(bug.x + bug.width / 2 + 8, screenY - 8);
+                    ctx.stroke();
+                }
+            });
+            
+            if (gameState === 'playing') {
+                ctx.fillStyle = isDanger ? '#e74c3c' : player.color;
+                ctx.fillRect(player.x, player.y, player.width, player.height);
+                
+                ctx.fillStyle = '#fff';
+                ctx.fillRect(player.x + 6, player.y + 8, 6, 8);
+                ctx.fillRect(player.x + 18, player.y + 8, 6, 8);
+                
+                ctx.fillStyle = '#2c3e50';
+                ctx.fillRect(player.x + 8, player.y + 10, 3, 4);
+                ctx.fillRect(player.x + 20, player.y + 10, 3, 4);
+                
+                if (isDanger) {
+                    ctx.fillStyle = '#fff';
+                    ctx.font = 'bold 12px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('↓', player.x + player.width / 2, player.y - 10);
+                }
+            }
+            
+            if (isDanger) {
+                ctx.fillStyle = `rgba(231, 76, 60, ${0.1 + Math.sin(Date.now() / 100) * 0.1})`;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+        }
+
+        function gameLoop(timestamp) {
+            const deltaTime = lastTime ? (timestamp - lastTime) / 1000 : 0;
+            lastTime = timestamp;
+            
+            if (deltaTime > 0.1) {
+                requestAnimationFrame(gameLoop);
+                return;
+            }
+            
+            update(deltaTime);
+            draw();
+            
+            requestAnimationFrame(gameLoop);
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (gameState !== 'playing') return;
+            
+            switch(e.code) {
+                case 'ArrowLeft':
+                case 'KeyA':
+                    keys.left = true;
+                    break;
+                case 'ArrowRight':
+                case 'KeyD':
+                    keys.right = true;
+                    break;
+                case 'Space':
+                    e.preventDefault();
+                    if (!isDanger) {
+                        jumpUp();
+                    }
+                    break;
+                case 'ArrowDown':
+                case 'KeyS':
+                    jumpDown();
+                    break;
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            switch(e.code) {
+                case 'ArrowLeft':
+                case 'KeyA':
+                    keys.left = false;
+                    break;
+                case 'ArrowRight':
+                case 'KeyD':
+                    keys.right = false;
+                    break;
+            }
+        });
+
+        document.getElementById('startBtn').addEventListener('click', () => {
+            resetGame();
+            gameState = 'playing';
+            document.getElementById('startScreen').classList.add('hidden');
+        });
+
+        document.getElementById('restartBtn').addEventListener('click', () => {
+            resetGame();
+            gameState = 'playing';
+            document.getElementById('gameOverScreen').classList.add('hidden');
+        });
+
+        document.getElementById('playAgainBtn').addEventListener('click', () => {
+            resetGame();
+            gameState = 'playing';
+            document.getElementById('winScreen').classList.add('hidden');
+        });
+
+        initFloors();
+        requestAnimationFrame(gameLoop);
+    </script>
+</body>
+</html>
